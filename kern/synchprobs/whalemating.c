@@ -34,17 +34,44 @@
 #include <lib.h>
 #include <thread.h>
 #include <test.h>
+#include<synch.h>
 
 #define NMATING 10
+struct cv *cv_male,*cv_female,*cv_mm;
+struct lock *lk_male,*lk_female,*lk_mm;
+
+
+int no_males=0,no_females=0,no_mm=0;
+int ismwaiting=0,isfwaiting=0,ismmwaiting=0;
 
 static
 void
 male(void *p, unsigned long which)
 {
+
 	(void)p;
 	kprintf("male whale #%ld starting\n", which);
+lock_acquire(lk_male);
 
-	// Implement this function 
+no_males++;
+
+
+if(no_females==0 || no_mm ==0 ){
+	ismwaiting=1;
+	cv_wait(cv_male,lk_male);
+	ismwaiting=0;
+}
+
+if(isfwaiting==0)
+	cv_signal(cv_female,lk_female);
+if(ismmwaiting==0)
+	cv_signal(cv_mm,lk_mm);
+
+
+kprintf("male whale #%ld ending\n", which);
+lock_release(lk_male);
+
+
 }
 
 static
@@ -53,8 +80,21 @@ female(void *p, unsigned long which)
 {
 	(void)p;
 	kprintf("female whale #%ld starting\n", which);
+	lock_acquire(lk_female);
+no_females++;
 
-	// Implement this function 
+if(no_males==0 || no_mm==0)
+	cv_wait(cv_female,lk_female);
+
+if(ismwaiting==0)
+	cv_signal(cv_male,lk_male);
+if(ismmwaiting==0)
+	cv_signal(cv_mm,lk_mm);
+
+	kprintf("female whale #%ld ending\n", which);
+	lock_release(lk_female);
+
+
 }
 
 static
@@ -64,7 +104,21 @@ matchmaker(void *p, unsigned long which)
 	(void)p;
 	kprintf("matchmaker whale #%ld starting\n", which);
 
-	// Implement this function 
+	lock_acquire(lk_mm);
+
+no_mm++;
+	if(no_females==0 || no_males==0)
+		cv_wait(cv_mm,lk_mm);
+	if(ismwaiting==0)
+		cv_signal(cv_male,lk_male);
+	if(isfwaiting==0)
+		cv_signal(cv_female,lk_female);
+
+	lock_release(lk_mm);
+
+
+kprintf("matchmaker whale #%ld ending\n", which);
+
 }
 
 
@@ -74,6 +128,18 @@ whalemating(int nargs, char **args)
 {
 
 	int i, j, err=0;
+
+	cv_male=cv_create("male");
+	cv_female=cv_create("female");
+	cv_mm=cv_create("mm");
+
+
+	lk_male=lock_create("male");
+	lk_female=lock_create("female");
+	lk_mm=lock_create("mm");
+
+
+
 	
 	(void)nargs;
 	(void)args;
@@ -120,3 +186,4 @@ whalemating(int nargs, char **args)
 
 	return 0;
 }
+
