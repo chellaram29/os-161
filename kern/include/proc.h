@@ -38,36 +38,73 @@
 
 #include <spinlock.h>
 #include <thread.h> /* required for struct threadarray */
+#include <kern/limits.h>
+#include<synch.h>
+#include<kern/errno.h>
+#include<kern/list.h>
 
 struct addrspace;
 struct vnode;
 #ifdef UW
 struct semaphore;
 #endif // UW
+/* Structure to hold the entry in filetable */
+struct ftentry {
+	struct vnode *vnode;
+	off_t offset;
+	struct lock *ft_lock;
+	int64_t refcount;
+	int32_t permissions;
+	off_t eof;
 
+};
+
+struct ptentry {
+	pid_t pid, ppid;
+	int exited, exitcode,isparentexited;
+	struct wchan *synch;
+
+};
+
+
+
+
+struct node *proctable;
+struct lock *proctable_lk;
 /*
  * Process structure.
  */
 struct proc {
-	char *p_name;			/* Name of this process */
-	struct spinlock p_lock;		/* Lock for this structure */
-	struct threadarray p_threads;	/* Threads in this process */
+	char *p_name; /* Name of this process */
+	struct spinlock p_lock; /* Lock for this structure */
+	struct threadarray p_threads; /* Threads in this process */
 
 	/* VM */
-	struct addrspace *p_addrspace;	/* virtual address space */
+	struct addrspace *p_addrspace; /* virtual address space */
 
 	/* VFS */
-	struct vnode *p_cwd;		/* current working directory */
+	struct vnode *p_cwd; /* current working directory */
 
-#ifdef UW
-  /* a vnode to refer to the console device */
-  /* this is a quick-and-dirty way to get console writes working */
-  /* you will probably need to change this when implementing file-related
-     system calls, since each process will need to keep track of all files
-     it has opened, not just the console. */
-  struct vnode *console;                /* a vnode for the console device */
-#endif
+	/* a vnode to refer to the console device */
+	/* this is a quick-and-dirty way to get console writes working */
+	/* you will probably need to change this when implementing file-related
+	 system calls, since each process will need to keep track of all files
+	 it has opened, not just the console.
+	 struct vnode *console;                a vnode for the console device */
 
+	/* updated to take care of all file opens */
+
+	/* __OPEN_MAX files can be opened per process */
+	struct ftentry *ftable[__OPEN_MAX];
+	/* current entry into ftable */
+	int32_t iter_ftable;
+
+	/* pid of the process */
+	pid_t pid;
+	pid_t ppid;
+	//list of child process created so far
+	struct node *childpid;
+    int no_of_cp;
 	/* add more material here as needed */
 };
 
@@ -78,7 +115,6 @@ extern struct proc *kproc;
 #ifdef UW
 extern struct semaphore *no_proc_sem;
 #endif // UW
-
 /* Call once during system startup to allocate data structures. */
 void proc_bootstrap(void);
 
@@ -100,5 +136,7 @@ struct addrspace *curproc_getas(void);
 /* Change the address space of the current process, and return the old one. */
 struct addrspace *curproc_setas(struct addrspace *);
 
+pid_t findunusedpid(void);
 
+struct ptentry *findptentry(pid_t pid);
 #endif /* _PROC_H_ */

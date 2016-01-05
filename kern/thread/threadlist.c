@@ -129,9 +129,12 @@ threadlist_insertbeforenode(struct thread *t, struct threadlistnode *onlist)
 	struct threadlistnode *addee;
 
 	addee = &t->t_listnode;
+	/* fix added for seeing zombies list with thread details */
+	addee->tln_self=t;
 
 	DEBUGASSERT(addee->tln_prev == NULL);
 	DEBUGASSERT(addee->tln_next == NULL);
+
 
 	addee->tln_prev = onlist->tln_prev;
 	addee->tln_next = onlist;

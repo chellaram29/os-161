@@ -59,9 +59,11 @@ struct proc *kproc;
 /*
  * Mechanism for making the kernel menu thread sleep while processes are running
  */
+
 #ifdef UW
 /* count of the number of processes, excluding kproc */
 static volatile unsigned int proc_count;
+volatile pid_t pid_counter=2;
 /* provides mutual exclusion for proc_count */
 /* it would be better to use a lock here, but we use a semaphore because locks are not implemented in the base kernel */ 
 static struct semaphore *proc_count_mutex;
@@ -90,6 +92,8 @@ proc_create(const char *name)
 		return NULL;
 	}
 
+
+
 	threadarray_init(&proc->p_threads);
 	spinlock_init(&proc->p_lock);
 
@@ -99,8 +103,23 @@ proc_create(const char *name)
 	/* VFS fields */
 	proc->p_cwd = NULL;
 
+
+
+
+proc->childpid=(struct node *)NULL;
+
+
+
 #ifdef UW
-	proc->console = NULL;
+
+	/*updating STDIN,STDOUT,STDERR in fdtable */
+
+
+		proc->ftable[0]=NULL;
+		proc->ftable[1]=NULL;
+		proc->ftable[2]=NULL;
+
+
 #endif // UW
 
 	return proc;
@@ -158,9 +177,19 @@ proc_destroy(struct proc *proc)
 #endif // UW
 
 #ifdef UW
-	if (proc->console) {
-	  vfs_close(proc->console);
+
+	for(int fd=0;fd<proc->iter_ftable;fd++){
+
+
+		if((proc->ftable[fd])->refcount==0)
+			vfs_close(proc->ftable[fd]->vnode);
+			kfree(proc->ftable[fd]);
+
+
 	}
+
+
+
 #endif // UW
 
 	threadarray_cleanup(&proc->p_threads);
@@ -207,6 +236,14 @@ proc_bootstrap(void)
   if (no_proc_sem == NULL) {
     panic("could not create no_proc_sem semaphore\n");
   }
+
+  proctable_lk=lock_create("ptable_lock");
+
+
+
+
+
+
 #endif // UW 
 }
 
@@ -221,22 +258,99 @@ proc_create_runprogram(const char *name)
 {
 	struct proc *proc;
 	char *console_path;
-
+	int err;
 	proc = proc_create(name);
 	if (proc == NULL) {
 		return NULL;
 	}
 
+
 #ifdef UW
-	/* open the console - this should always succeed */
+	/* open the console - this should always succeed*/
 	console_path = kstrdup("con:");
 	if (console_path == NULL) {
-	  panic("unable to copy console path name during process creation\n");
+		panic("unable to copy console path name during process creation\n");
 	}
-	if (vfs_open(console_path,O_WRONLY,0,&(proc->console))) {
-	  panic("unable to open the console during process creation\n");
+	/*
+	 if (vfs_open(console_path,O_WRONLY,0,&(proc->console))) {
+	 panic("unable to open the console during process creation\n");
+	 }
+	 kfree(console_path);*/
+
+	/*updating STDIN,STDOUT,STDERR in fdtable */
+
+	proc->ftable[0]=(struct ftentry *)kmalloc(sizeof(struct ftentry));
+	if(proc->ftable[0]==NULL) {
+
+		kfree(proc);
+		return NULL;
+	}
+
+	proc->ftable[1]=(struct ftentry *)kmalloc(sizeof(struct ftentry));
+	if(proc->ftable[1]==NULL) {
+		kfree(proc->ftable[0]);
+		kfree(proc);
+		return NULL;
+	}
+
+	proc->ftable[2]=(struct ftentry *)kmalloc(sizeof(struct ftentry));
+	if(proc->ftable[2]==NULL) {
+
+		kfree(proc->ftable[0]);
+		kfree(proc->ftable[1]);
+		kfree(proc);
+		return NULL;
+	}
+
+	err= vfs_open(console_path, O_RDONLY, (mode_t) NULL, &(proc->ftable[0]->vnode));
+
+
+	console_path = kstrdup("con:");
+	err= vfs_open(console_path, O_WRONLY, (mode_t) NULL, &(proc->ftable[1]->vnode));
+
+
+	console_path = kstrdup("con:");
+	err=vfs_open(console_path, O_WRONLY, (mode_t) NULL, &(proc->ftable[2]->vnode));
+
+
+	if(err)
+	{
+		kfree(proc->ftable[0]);
+		kfree(proc->ftable[1]);
+		kfree(proc->ftable[2]);
+		kfree(console_path);
+		kfree(proc);
+		return NULL;
+
 	}
 	kfree(console_path);
+	proc->ftable[0]->permissions=O_RDONLY;
+	proc->ftable[0]->ft_lock = lock_create("ft_lock");
+	proc->ftable[0]->offset = 0;
+	proc->ftable[0]->refcount = 1;
+
+
+
+
+	proc->ftable[1]->permissions=O_WRONLY;
+	proc->ftable[1]->ft_lock = lock_create("ft_lock");
+	proc->ftable[1]->offset = 0;
+	proc->ftable[1]->refcount = 1;
+
+
+	proc->ftable[2]->permissions=O_WRONLY;
+	proc->ftable[2]->ft_lock = lock_create("ft_lock");
+	proc->ftable[2]->offset = 0;
+	proc->ftable[2]->refcount = 1;
+
+
+	proc->iter_ftable=3;
+
+
+proc->no_of_cp=0;
+
+
+
 #endif // UW
 	  
 	/* VM fields */
@@ -363,4 +477,37 @@ curproc_setas(struct addrspace *newas)
 	proc->p_addrspace = newas;
 	spinlock_release(&proc->p_lock);
 	return oldas;
+}
+
+pid_t findunusedpid(void){
+
+	pid_t i = 2;
+	struct node *p;
+	for (; i <= 32767; i++) {
+		p = proctable;
+		while (p != NULL ) {
+			if (i == ((struct ptentry *) p->data)->pid)
+				break;
+			p = p->next;
+		}
+		if (p == NULL )
+			return i;
+
+	}
+
+	return ENPROC;
+
+}
+
+struct ptentry *findptentry(pid_t pid){
+
+struct node *p=proctable;
+while(p!=NULL){
+	if(((struct ptentry *)p->data)->pid==pid)
+		return (struct ptentry*)p->data;
+
+	p=p->next;
+}
+
+return (struct ptentry *)NULL;
 }

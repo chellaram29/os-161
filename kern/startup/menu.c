@@ -104,6 +104,7 @@ cmd_progthread(void *ptr, unsigned long nargs)
 
 	result = runprogram(progname);
 	if (result) {
+		kheap_printstats();
 		kprintf("Running program %s failed: %s\n", args[0],
 			strerror(result));
 		return;
@@ -136,17 +137,19 @@ common_prog(int nargs, char **args)
 		"synchronization-problems kernel.\n");
 #endif
 
+
 	/* Create a process for the new program to run in. */
 	proc = proc_create_runprogram(args[0] /* name */);
 	if (proc == NULL) {
 		return ENOMEM;
 	}
-
+	else{
 	result = thread_fork(args[0] /* thread name */,
 			proc /* new process */,
 			cmd_progthread /* thread function */,
 			args /* thread arg */, nargs /* thread arg */);
 	if (result) {
+		kheap_printstats();
 		kprintf("thread_fork failed: %s\n", strerror(result));
 		proc_destroy(proc);
 		return result;
@@ -159,6 +162,7 @@ common_prog(int nargs, char **args)
 #endif // UW
 
 	return 0;
+	}
 }
 
 /*

@@ -29,9 +29,9 @@
 
 #ifndef _SYSCALL_H_
 #define _SYSCALL_H_
+#include <mips/trapframe.h>
 
 
-struct trapframe; /* from <machine/trapframe.h> */
 
 /*
  * The system call dispatcher.
@@ -44,7 +44,7 @@ void syscall(struct trapframe *tf);
  */
 
 /* Helper for fork(). You write this. */
-void enter_forked_process(struct trapframe *tf);
+void enter_forked_process(void *tf,unsigned long );
 
 /* Enter user mode. Does not return. */
 void enter_new_process(int argc, userptr_t argv, vaddr_t stackptr,
@@ -55,14 +55,27 @@ void enter_new_process(int argc, userptr_t argv, vaddr_t stackptr,
  * Prototypes for IN-KERNEL entry points for system call implementations.
  */
 
+
+
 int sys_reboot(int code);
 int sys___time(userptr_t user_seconds, userptr_t user_nanoseconds);
 
 #ifdef UW
-int sys_write(int fdesc,userptr_t ubuf,unsigned int nbytes,int *retval);
+
+pid_t sys_fork(struct trapframe *tf,int *);
+int sys__getcwd(userptr_t buf, size_t buflen,int *);
+int sys_chdir(userptr_t pathname,int *);
+off_t sys_lseek(int fd, off_t pos, userptr_t whence,int *);
+int sys_dup2(int, int, int*);
+int sys_close(int ,int *);
+int sys_open(userptr_t filename, int flags,int *error);
+int sys_write(int fdesc,userptr_t ubuf,unsigned int nbytes,int *error);
+int sys_read(int fdesc,userptr_t ubuf,unsigned int nbytes,int *error);
 void sys__exit(int exitcode);
-int sys_getpid(pid_t *retval);
+pid_t sys_getpid(int *error);
 int sys_waitpid(pid_t pid, userptr_t status, int options, pid_t *retval);
+
+int sys_execv(struct trapframe *tf, userptr_t program, userptr_t *uargs);
 
 #endif // UW
 

@@ -362,7 +362,7 @@ docommand(char *buf)
 			return _MKWAIT_EXIT(255);
 		case 0:
 			/* child */
-			execv(args[0], args);
+			execv(args[0], &args[1]);
 			warn("%s", args[0]);
 			/*
 			 * Use _exit() instead of exit() in the child
