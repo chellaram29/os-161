@@ -63,7 +63,7 @@ int sys___time(userptr_t user_seconds, userptr_t user_nanoseconds);
 #ifdef UW
 
 pid_t sys_fork(struct trapframe *tf,int *);
-int sys__getcwd(userptr_t buf, size_t buflen,int *);
+int sys__getcwd(char * buf, size_t buflen,int *);
 int sys_chdir(userptr_t pathname,int *);
 off_t sys_lseek(int fd, off_t pos, userptr_t whence,int *);
 int sys_dup2(int, int, int*);

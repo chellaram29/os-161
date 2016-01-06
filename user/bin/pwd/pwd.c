@@ -47,6 +47,7 @@ main()
 	char buf[PATH_MAX+1], *p;
 
 	p = getcwd(buf, sizeof(buf));
+	printf("bufis:*****%s******\n", buf);
 	if (p == NULL) {
 		err(1, ".");
 	}

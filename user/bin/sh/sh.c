@@ -362,6 +362,8 @@ docommand(char *buf)
 			return _MKWAIT_EXIT(255);
 		case 0:
 			/* child */
+			printf("args[0]:%s",args[0]);
+			printf("args[1]:%s",args[1]);
 			execv(args[0], &args[1]);
 			warn("%s", args[0]);
 			/*
@@ -506,6 +508,8 @@ main(int argc, char *argv[])
 	 * Allow argc to be 0 in case we're running on a broken kernel,
 	 * or one that doesn't set argv when starting the first shell.
 	 */
+
+	printf("argc is :%d\n",argc);
 	if (argc == 0 || argc == 1) {
 		interactive();
 	}

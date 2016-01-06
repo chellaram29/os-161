@@ -34,6 +34,7 @@ void sys__exit(int exitcode) {
 
 		} else {
 
+			(void)parentptentry;
 			childptentry->exitcode = exitcode;
 			childptentry->exited = 1;
 			wchan_wakeall(childptentry->synch);
@@ -97,7 +98,7 @@ int sys_waitpid(pid_t pid, userptr_t status, int options, int *error) {
 		}
 
 		else {
-			wchan_lock((struct wchan *) pte->synch);
+			wchan_lock( pte->synch);
 			wchan_sleep(pte->synch);
 
 		}
@@ -165,6 +166,9 @@ pid_t sys_fork(struct trapframe *tf, int *error) {
 	utf->tf_sp = tf->tf_sp;
 	utf->tf_s8 = tf->tf_s8;
 	utf->tf_epc = tf->tf_epc;
+
+
+
 
 //maximum process count
 

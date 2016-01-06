@@ -244,19 +244,19 @@ int sys_chdir(userptr_t pathname, int *error) {
 
 }
 
-int sys__getcwd(userptr_t buf, size_t buflen, int *error) {
+int sys__getcwd(char *buf, size_t buflen, int *error) {
 	struct uio u;
 	struct iovec iv;
 	int rv;
 	*error = -1;
 
-	iv.iov_ubase = buf;
-	iv.iov_len = buflen;
+	iv.iov_ubase = (userptr_t)buf;
+	iv.iov_len = buflen-1;
 
 	u.uio_iov = &iv;
 	u.uio_iovcnt = 1;
 	u.uio_offset = 0;
-	u.uio_resid = buflen;
+	u.uio_resid = buflen-1;
 	u.uio_rw = UIO_READ;
 	u.uio_segflg = UIO_USERSPACE;
 	u.uio_space = curproc->p_addrspace;
@@ -264,6 +264,8 @@ int sys__getcwd(userptr_t buf, size_t buflen, int *error) {
 	rv = vfs_getcwd(&u);
 	if (rv == 0)
 		*error = 0;
+
+	buf[strlen((char *)buf)] = '\0';
 
 	return rv;
 

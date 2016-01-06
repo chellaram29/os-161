@@ -42,6 +42,7 @@
 #include <sfs.h>
 #include <syscall.h>
 #include <test.h>
+#include<wchan.h>
 #include "opt-synchprobs.h"
 #include "opt-sfs.h"
 #include "opt-net.h"
@@ -144,6 +145,32 @@ common_prog(int nargs, char **args)
 		return ENOMEM;
 	}
 	else{
+		pid_t pid;
+		struct ptentry *ptentry;
+		lock_acquire(proctable_lk);
+		pid = findunusedpid();
+		if (pid == ENPROC) {
+			lock_release(proctable_lk);
+			return pid;
+		} else {
+			ptentry = (struct ptentry *) kmalloc(sizeof(struct ptentry));
+
+			if (ptentry == NULL )
+				return ENOMEM;
+
+			ptentry->pid = pid;
+			ptentry->ppid = -1;
+			ptentry->exited = 0;
+			ptentry->synch = wchan_create("proctable");
+			ptentry->exitcode = -1;
+			ptentry->isparentexited = -1;
+
+			result = insert(&proctable, ptentry);
+			lock_release(proctable_lk);
+			if (result != 0)
+				return result;
+
+proc->pid=pid;
 	result = thread_fork(args[0] /* thread name */,
 			proc /* new process */,
 			cmd_progthread /* thread function */,
@@ -162,6 +189,7 @@ common_prog(int nargs, char **args)
 #endif // UW
 
 	return 0;
+		}
 	}
 }
 

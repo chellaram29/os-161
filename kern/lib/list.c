@@ -35,9 +35,11 @@ void delete(struct node **head, void *ptr) {
 	int nodenumber = 0;
 	int position=0;
 
-	while(p->data!=ptr)
-		position++;
+	while(p->data!=ptr){
 
+		position++;
+		p=p->next;
+	}
 
 	p=*head;
 
